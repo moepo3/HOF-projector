@@ -11,9 +11,9 @@ Eventually expanding to MLB and NFL.
 The NBA Hall of Fame has no objective criteria. Voters are inconsistent, era bias is real, and there is no agreed-upon framework for what a Hall of Fame career looks like. This project attempts to build one — data-first, era-adjusted, and archetype-driven rather than relying on a single statistical threshold.
 
 The goal is to answer questions like:
-- Is Bam Adebayo a Hall of Famer if he plays until 38? What about 42?
+- Will your favorite player be a hall of famer? What would he need to do to become one?
 - Who are the biggest statistical snubs in HOF history?
-- What archetype does a player belong to, and does their career match it?
+- Who is in the Hall of Fame that does not belong?
 
 ---
 
