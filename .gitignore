@@ -1,0 +1,24 @@
+# Data — raw CSVs and database are large and reproducible
+data/raw/
+data/hof.db
+data/processed/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+
+# Logs
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Mac
+.DS_Store
+
+# VS Code
+.vscode/
