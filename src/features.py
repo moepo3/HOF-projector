@@ -485,6 +485,10 @@ def build_features(db_path: str = DB_PATH) -> pd.DataFrame:
             "retired":     int(player.get("retired", 1) or 1),
             "seasons_played": len(ps),
             "games_played": ps["g"].sum(),
+            # career_minutes is a better longevity proxy than games_played —
+            # it discounts end-of-career bench stints (e.g. late-career KG)
+            # and properly weights players who played heavy minutes vs. spot duty.
+            "career_minutes": (ps["g"] * ps["mp_per_game"]).sum() if "mp_per_game" in ps.columns else ps["g"].sum() * 30,
             "award_score":  award_score,
             "championship_score": champ_score,
             "rings":        rings,
