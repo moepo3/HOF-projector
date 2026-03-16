@@ -113,12 +113,15 @@ def ingest_players(engine):
     else:
         df["size_bucket"] = "Unknown"
 
-    # HOF flag — column contains True/False as strings
-    if "hof_inducted" in df.columns:
-        hof_str = df["hof_inducted"].astype(str).str.strip().str.lower()
-        df["hof_inducted"] = hof_str == "true"
-    else:
-        df["hof_inducted"] = False
+    # HOF flag — use players-only list, excludes coaches/contributors/referees
+    # The Kaggle dataset flags all HOF inductees regardless of category
+    from hof_players import get_hof_player_ids, get_hof_player_names
+    hof_ids   = get_hof_player_ids()
+    hof_names = get_hof_player_names()
+    df["hof_inducted"] = (
+        df["player_id"].isin(hof_ids) |
+        df["name"].isin(hof_names)
+    )
 
     # Active / retired
     current_season   = 2025
