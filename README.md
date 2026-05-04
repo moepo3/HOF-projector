@@ -153,6 +153,6 @@ The aging curve script builds the underlying trajectory model. The classifier sc
 
 ## Motivation
 
-This project was built to explore how player evaluation can move beyond static statistics and toward modeling career trajectories.
+This project was built to explore how player evaluation can move beyond static statistics and toward modeling career trajectories. Hall of Fame debates are often shaped by narrative and subjective interpretation, and this project is an attempt to introduce a more structured, data-driven framework for evaluating player careers.
 
 It is intended as a step toward more complete player projection systems used in professional sports analytics.
