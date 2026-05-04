@@ -117,3 +117,42 @@ Example outputs are saved in the `data/processed` directory.
 ---
 
 ## Project Structure
+
+src/
+aging_curve.py
+features.py
+archetypes.py
+classifier.py
+
+data/
+raw/
+processed/
+
+
+---
+
+## Running the Project
+
+Install dependencies and run the scripts directly:
+
+python src/aging_curve.py
+python src/classifier.py
+
+
+The aging curve script builds the underlying trajectory model. The classifier script trains and evaluates the Hall of Fame model.
+
+---
+
+## Limitations
+
+- Aging curves rely on historical averages and do not explicitly model injuries  
+- Earlier eras have less complete data  
+- Role and usage changes are only partially captured through clustering  
+
+---
+
+## Motivation
+
+This project was built to explore how player evaluation can move beyond static statistics and toward modeling career trajectories.
+
+It is intended as a step toward more complete player projection systems used in professional sports analytics.
