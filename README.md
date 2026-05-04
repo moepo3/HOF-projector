@@ -1,184 +1,128 @@
-# NBA Hall of Fame Predictor
+NBA Player Projection and Hall of Fame Modeling
 
-A full data engineering and machine learning pipeline that predicts NBA Hall of Fame probability for every player in history — and produces an all-time ranking of the greatest players ever.
+This project builds a data-driven system for evaluating NBA players and estimating Hall of Fame probability. It combines historical performance data, aging curve modeling, and machine learning to capture both peak value and long-term career trajectories.
 
----
+The goal is not just to classify past players, but to provide a framework for evaluating active players whose careers are still unfolding.
 
-## What This Does
+Overview
 
-- **HOF Probability** — for every player with 400+ games and 5+ career Win Shares, the model outputs a probability (0–100%) of HOF induction based on their statistical profile
-- **Career Projection** — active players are projected forward using aging curves before scoring, so LeBron at age 40 isn't penalized for not yet being inducted
-- **All-Time Ranking** — an uncapped backend score ranks every player in history by a peak-weighted composite of stats, accolades, and ring quality
-- **Archetypes** — 16 modern + 4 pre-1974 statistical archetypes cluster players by playing style
+Most Hall of Fame models rely on static career totals or awards. This approach focuses on how players develop over time.
 
----
+The pipeline:
 
-## All-Time Top 10 (Backend Score)
+Tracks year-over-year changes in player performance
+Builds empirical aging curves from historical data
+Engineers features that emphasize peak production and efficiency
+Uses an ensemble model to estimate Hall of Fame likelihood
 
-| Rank | Player | Backend Score |
-|------|--------|---------------|
-| 1 | Michael Jordan | 413 |
-| 2 | LeBron James | 407 |
-| 3 | Kareem Abdul-Jabbar | 385 |
-| 4 | Tim Duncan | 358 |
-| 5 | Kobe Bryant | 346 |
-| 6 | Kevin Garnett | 319 |
-| 7 | Magic Johnson | 310 |
-| 8 | Karl Malone | 309 |
-| 9 | Hakeem Olajuwon | 305 |
-| 10 | Larry Bird | 301 |
+This allows the model to account for both longevity and peak performance in a consistent way.
 
----
+Data
 
-## Stack
+The project uses season-level NBA data stored in a SQLite database. Each row represents a player-season and includes:
 
-| Layer | Technology |
-|-------|-----------|
-| Database | SQLite (local) |
-| Data pipeline | Python, Pandas, NumPy |
-| Feature engineering | Custom peak windows, per-75 normalization, aging curves |
-| Clustering | K-Means (scikit-learn) |
-| Classification | Soft voting ensemble: Logistic Regression + Random Forest + Gradient Boosting |
-| Data source | [Kaggle: NBA Player Stats](https://www.kaggle.com/datasets/sumitrodatta/nba-aba-baa-stats) |
+Box score stats
+Advanced metrics (BPM, VORP, WS/48, TS%)
+Age and season context
+Player size/archetype labels
 
----
+Counting stats are normalized to per-75 possessions to allow comparisons across eras.
 
-## Pipeline
+Aging Curve Model
 
-```
-src/schema.py      → Initialize SQLite database
-src/ingest.py      → Load Kaggle CSVs, flag HOF players, compute per-75 stats
-src/features.py    → Build peak windows (3yr, 7yr), aging curves, championship scores
-src/archetypes.py  → K-Means clustering into 16 modern + 4 pre-1974 archetypes
-src/classifier.py  → Train ensemble, compute HOF probability + backend score
-```
+Aging curves are built using a delta-based method.
 
-Run the full pipeline:
-```bash
-python3 src/schema.py
-python3 src/ingest.py
-python3 src/features.py
-python3 src/archetypes.py
-python3 src/classifier.py
-```
+For each player with consecutive seasons:
 
----
+Identify seasons at age N and N+1
+Compute the change in each stat
+Aggregate those changes across all players at each age
 
-## Key Design Decisions
+This produces an empirical estimate of how performance evolves with age.
 
-### Feature Engineering
+Curves are segmented by size group (Guard, Wing, Big) to reflect differences in career trajectories.
 
-**Per-75 possession normalization** — all rate stats are normalized to per-75 possessions using league pace for each season. This makes cross-era comparisons valid: a 1965 player averaging 25 PPG in a 110-pace league is not the same as a 2005 player averaging 25 PPG in a 90-pace league.
+These curves are later used to project future performance for active players.
 
-**Peak windows** — rather than career averages, the model uses the player's best consecutive 3-year and 7-year windows by VORP sum. This correctly identifies players with elite peaks but shorter careers (e.g., Derrick Rose).
+Feature Engineering
 
-**Career minutes over games played** — longevity is measured in career minutes rather than games played. A player who averaged 35 minutes for 15 seasons is valued appropriately over someone who played 20 seasons at declining minutes.
+Player evaluation is based on a combination of peak performance and career context.
 
-### HOF Label Quality
+Key features include:
 
-The HOF flag in the raw dataset includes coaches, contributors, and referees. We override this with a hand-verified player-only list (`src/hof_players.py`) sourced from the official Naismith Memorial Basketball Hall of Fame, cross-referenced against Basketball Reference IDs.
+Peak windows (for example, best 3-year and 7-year stretches)
+Efficiency metrics (TS%, WS/48)
+Impact metrics (BPM, VORP)
+Per-75 possession normalization
+Championship and team success context
 
-**International players** — five players (Radja, Petrovic, Sabonis, Marciulionis, Yao Ming) are flagged as `PRIMARILY_INTERNATIONAL` and excluded from classifier training. Their NBA stats alone cannot explain their induction, which was based largely on non-NBA careers.
+The focus is on capturing how dominant a player was at their best, not just cumulative totals.
 
-### Two-Model Architecture
+Archetypes
 
-**Modern model (post-1974):** Uses VORP, Win Shares, All-NBA, DPOY, Finals MVP, ring quality, defensive scores, and efficiency metrics. AUC: 0.965.
+Players are grouped using clustering to capture differences in play style.
 
-**Pre-1974 model:** Blocks and steals were not recorded before 1974, making VORP/BPM unavailable. This model relies heavily on All-Star selections, All-NBA teams, and Win Shares, with an `award_weight_boost` feature that multiplies award values to compensate for missing advanced stats. AUC: 0.967.
+K-means clustering is used to define modern archetypes
+Separate handling is included for earlier eras with different statistical profiles
 
-> **Caveat:** Pre-1974 HOF probability should be interpreted with caution. The absence of blocks, steals, and advanced metrics means the model cannot fully evaluate these players. This is by design — we would rather be honest about data limitations than produce false precision.
+This allows comparisons within more meaningful peer groups rather than across fundamentally different roles.
 
-### Ring Quality Score
+Model
 
-```
-ring_quality = opponent_win_pct × player_vorp_share
-```
+The classification step uses an ensemble of:
 
-We use only the Finals opponent's regular season win percentage — not the champion's. This correctly rewards beating a great opponent regardless of how good your own team was. LeBron's 2016 ring (beating the 73-win Warriors) scores higher than most Jordan rings because the opponent was historically dominant.
+Logistic regression
+Random forest
+Gradient boosting
 
-### Backend Score Formula
+Predictions are combined using soft voting.
 
-The all-time ranking uses an uncapped composite score:
+The model outputs a probability that a given player profile corresponds to a Hall of Fame career.
 
-```
-backend_score = (adj_prob × 150)
-              + (peak7_vorp × 1.5)
-              + (total_vorp × 0.1)
-              + (peak7_ws_per_48 × total_ws × 0.5)
-              + accolade_bonus
-```
+Career Projection
 
-**Accolade weights:**
+For active players, the system applies aging curves to estimate future production.
 
-| Award | Points |
-|-------|--------|
-| All-NBA 1st Team | 5 |
-| MVP | 3 |
-| All-NBA 2nd Team | 3 |
-| Finals MVP | 3 |
-| All-Defense 1st Team | 3 |
-| DPOY | 2 |
-| All-NBA 3rd Team | 1 |
-| All-Defense 2nd Team | 1 |
-| Ring quality score | ×12 |
+Projected stats are then passed through the same feature pipeline and model.
 
-All-Star selections are intentionally excluded from the backend score — they are a popularity vote and do not add signal beyond what VORP and All-NBA already capture.
+This provides a forward-looking estimate rather than penalizing players who have not yet completed their careers.
 
-### Why Jordan #1 Over LeBron
+Outputs
 
-Jordan's `peak7_vorp_sum` of 75.3 is the highest of any player in the dataset — nearly double Kevin Garnett's 55.5 and significantly above LeBron's 66.3. The backend score weights peak7 at ×1.5, which properly rewards the most dominant 7-year stretch ever recorded. LeBron's extraordinary career longevity (158 total VORP) keeps him within 6 points of Jordan. The near-tie accurately reflects the genuine debate.
+The project produces:
 
-### Why Jordan's HOF Probability Is ~72%
+Aging curve datasets (per-age performance changes)
+Player-level feature tables
+Model predictions for Hall of Fame probability
+Plots of aging curves by stat and player type
 
-The model's raw probability is a known limitation. The classifier was trained on Win Shares and All-NBA signals, and Jordan's shorter career (1037 games vs. e.g. KG's 1504) gives him slightly lower career totals than some HOFers with longer careers. The backend score — which heavily weights peak performance — is the correct ranking metric. The HOF probability is shown as-is because it reflects a real pattern in the training data, not a data error.
+Example outputs are saved in the data/processed directory.
 
----
+Project Structure
+src/
+  aging_curve.py
+  features.py
+  archetypes.py
+  classifier.py
 
-## Model Performance
+data/
+  raw/
+  processed/
+Running the Project
 
-| Model | AUC | Training Set |
-|-------|-----|--------------|
-| Modern (post-1974) | 0.965 | 1,347 players (78 HOF) |
-| Pre-1974 | 0.967 | 126 players (34 HOF) |
+Install dependencies and run the scripts directly:
 
-Ensemble: Soft voting average of calibrated Logistic Regression, Random Forest, and Gradient Boosting.
+python src/aging_curve.py
+python src/classifier.py
 
----
+The aging curve script builds the underlying trajectory model. The classifier script trains and evaluates the Hall of Fame model.
 
-## Known Limitations
+Limitations
+Aging curves rely on historical averages and do not explicitly model injuries
+Earlier eras have less complete data
+Role and usage changes are only partially captured through clustering
+Motivation
 
-1. **No playoff stats** — players with outsized playoff performance (e.g. Jimmy Butler) are undervalued. The model only sees regular season statistics.
-2. **Injury-shortened careers** — players who retired early due to injury (Rose, Grant Hill, Penny Hardaway) are scored on actual career totals, not projected healthy careers. Rose's ~5% reflects this honestly.
-3. **Pre-1974 era** — advanced metrics unavailable; probability estimates for this era are approximate.
-4. **International careers** — players inducted primarily for non-NBA careers will show low HOF probabilities. This is expected and documented.
+This project was built to explore how player evaluation can move beyond static statistics and toward modeling career trajectories.
 
----
-
-## Pending Development
-
-- [ ] Playoff performance feature (Jimmy Butler problem)
-- [ ] Westbrook vs. Jokic archetype naming distinction (same cluster, different efficiency profiles)
-- [ ] Streamlit frontend — player search, HOF probability, archetype card, career trajectory
-- [ ] GridSearchCV hyperparameter tuning
-- [ ] BigQuery + dbt migration for production
-- [ ] MLB / NFL expansion (Phase 2)
-
----
-
-## Data
-
-Raw CSVs not committed (Kaggle terms). Download from:
-https://www.kaggle.com/datasets/sumitrodatta/nba-aba-baa-stats
-
-Place in `data/raw/` before running the pipeline.
-
-Required files: `Player Per Game.csv`, `Advanced.csv`, `Player Career Info.csv`,
-`All-Star Selections.csv`, `End of Season Teams.csv`, `Player Award Shares.csv`,
-`Team Summaries.csv`
-
----
-
-## Author
-
-Moe Posner — Data Engineer
-[GitHub](https://github.com/moepo3)
+It is intended as a step toward more complete player projection systems used in professional sports analytics.
